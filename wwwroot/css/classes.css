@@ -1,0 +1,73 @@
+.arena {
+    min-width: 900px;
+    min-height: 600px;
+    border-radius: 5px;
+}
+
+
+
+.game-button {
+
+    margin: 10px 0px 10px 10px;
+    border-radius: 5px;
+}
+
+
+.game-console {
+    
+    display: none;
+    width: 900px;
+    min-width: 900px;
+    height: 200px;
+    min-height: 200px;
+    background-color: rgb(44, 42, 42);
+    color: white;
+    overflow: auto;
+    border-radius: 5px;
+    margin-top: 10px;
+    font-weight: bolder;
+    padding: 15px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+
+.game-console-input {
+    width: 900px;
+    min-width: 900px;
+    height: 30px;
+    min-height: 30px;
+    margin-top: 10px;
+    border-radius: 5px 5px 5px 5px;
+    overflow: auto;
+    background-color: black;
+    color: white;
+    border: none;
+    font-weight: bolder;
+    padding: 5px 5px 5px 10px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+
+.game-container {
+    
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    overflow: none;
+    
+}
+
+
+.game-top-row {
+    
+    width: 900px;
+    min-width: 900px;
+    display: flex;
+    justify-content: space-between;
+    padding: 5px;
+}
+
+
+.title {
+    margin-bottom: 20px;
+}

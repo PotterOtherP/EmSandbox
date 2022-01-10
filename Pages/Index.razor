@@ -1,0 +1,341 @@
+﻿@using System.Collections.Generic;
+@using System.Timers;
+@using Sandbox.Source;
+@page "/"
+
+
+<PageTitle>Index</PageTitle>
+
+<div class="game-top-row">
+    <h1>Sandbox</h1>
+    <div>
+        <button class="game-button" @onclick="@StartGame" @onkeydown="@GetUserKeyInput">Start Game</button>
+        <button class="game-button" @onclick="@EndGame">End Game</button>
+    </div>
+</div>
+
+<svg xmlns="http://www.w3.org/2000/svg"
+        xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:ev="http://www.w3.org/2001/sml-events"
+        width=@WIDTH
+        height=@HEIGHT
+        viewbox="-450 -300 @WIDTH @HEIGHT"
+        class="arena">
+
+@((MarkupString)SVG_Markup)
+
+</svg>
+
+    <input type="text" class="game-console-input" @bind="@ConsoleInput" @bind:event="oninput"
+        @onkeyup="@ProcessConsoleInput" @onkeyup:preventDefault>
+
+<div class="game-console">
+    @((MarkupString)ConsoleOutput)
+</div>
+
+
+
+@code {
+
+    private static readonly int WIDTH = 900;
+    private static readonly int HEIGHT = 600;
+    private static readonly char[] BADCHARS = {'<', '>', '(', ')', '/', '\\', '\'', '\"', '=', ';'};
+
+    private static readonly string StartColor = "#a0a0a0";
+    private static readonly string BlueColor = "#aaaacc";
+    private static readonly string GreenColor = "#aaccaa";
+    private static readonly string RedColor = "#ccaaaa";
+
+    private string ConsoleInput = ">> ";
+    private string ConsoleOutput = "";
+    private List<string> ConsoleEntries = new List<string>();
+    private List<Sprite> Sprites = new List<Sprite>();
+    private int ConsoleEntriesIndex = 0;
+
+    private Random rand = new Random();
+
+    private int pRed = 160;
+    private int pBlue = 160;
+    private int pGreen = 160;
+
+    private int vRed = 1;
+    private int vGreen = 2;
+    private int vBlue = 3;
+
+    private bool TimerDisposed = false;
+    private static int FPS = 40;
+    private static int MSperFrame = 1000/FPS;
+    private Timer gameTimer = new Timer(MSperFrame);
+    private bool FrameComplete = true;
+    private bool GameOver = true;
+
+
+    private string SVG_Markup = "<rect x=\"0\" y=\"0\" width=\"" + WIDTH + "\" height=\"" + HEIGHT
+        + "\" fill=\"" + StartColor + "\"></rect>";
+
+    private string Buffer = "";
+
+    private void StartGame() {
+
+        if (!GameOver) return;
+
+        GameOver = false;
+
+        if (TimerDisposed) gameTimer = new Timer(MSperFrame);
+        Buffer = "";
+        SVG_Markup = Rect(0, 0, WIDTH, HEIGHT, StartColor);
+
+        Sprite ball = new Sprite(10, 10);
+        ball.InternalMarkup = "<circle cx=\"0\" cy=\"0\" r=\"20\" fill=\"#a01010\"/>" +
+            "<rect x=\"-20\" y=\"-30\" width=\"40\" height=\"10\" fill=\"green\" />";
+        ball.VelocityX = 10;
+        ball.VelocityY = 10;
+        ball.RotationVelocity = 10;
+
+        Sprites.Add(ball);
+
+        gameTimer.Elapsed += UpdateGame;
+        gameTimer.AutoReset = true;
+        gameTimer.Enabled = true;
+
+        Console.WriteLine("Game started.");
+
+    }
+
+    private void UpdateGame(Object? source, ElapsedEventArgs e) {
+
+        if (!FrameComplete)
+        {
+            Console.WriteLine("Frame was not completed.");
+            if (FPS >= 10) --FPS;
+            MSperFrame = 1000/FPS;
+
+            try {
+                gameTimer.Dispose();
+                gameTimer = new Timer(MSperFrame);
+                Console.WriteLine("New timer created, FPS: " + FPS);
+            }
+            catch (Exception ex) {
+                Console.WriteLine(ex.Message);
+            }
+
+        }
+
+        FrameComplete = false;
+
+        if (pRed == 255 || pRed == 0) vRed *= -1;
+        if (pGreen >= 254 || pGreen <= 1) vGreen *= -1;
+        if (pBlue >= 253 || pBlue <= 2) vBlue *= -1;
+
+        pRed += vRed;
+        pGreen += vGreen;
+        pBlue += vBlue;
+
+        Buffer = Rect(0, 0, WIDTH, HEIGHT, GetHexColor(pRed, pGreen, pBlue));
+        Render();
+        Console.WriteLine("Time: " + e.SignalTime);
+    }
+
+    private void PauseGame() {
+
+        Console.WriteLine("Game paused.");
+    }
+
+    private void Render() {
+
+        foreach (Sprite s in Sprites)
+        {
+            s.Draw();
+            Buffer += s.Markup;
+
+            if (s.OriginX <= 0)
+            {
+                s.VelocityX *= -1;
+                s.OriginX = 1;
+            }
+
+            if (s.OriginX >= WIDTH)
+            {
+                s.VelocityX *= -1;
+                s.OriginX = WIDTH - 1;
+            }
+
+            if (s.OriginY <= 0)
+            {
+                s.VelocityY *= -1;
+                s.OriginY = 1;
+            }
+
+            if (s.OriginY >= HEIGHT)
+            {
+                s.VelocityY *= -1;
+                s.OriginY = HEIGHT - 1;
+
+            }
+
+            foreach (Sprite other in Sprites)
+            {
+                if (Sprites.IndexOf(other) != Sprites.IndexOf(s))
+                {
+                    double d = GetDistance(s, other);
+
+                    if (d < 5.0F)
+                    {
+                        Console.WriteLine("Collision!");
+                    }
+                }
+            }
+            
+        }
+
+        SVG_Markup = Buffer;
+        StateHasChanged();
+        FrameComplete = true;
+    }
+
+    public double GetDistance(Sprite s1, Sprite s2)
+    {
+        double result = 0.0F;
+
+        double a = (s1.OriginX - s2.OriginX)*(s1.OriginX - s2.OriginX)*1.0F;
+        double b = (s1.OriginY - s2.OriginY)*(s1.OriginY - s2.OriginY)*1.0F;
+        
+        result = Math.Sqrt(a + b);
+
+        return result;
+    }
+
+    private void EndGame() {
+
+        gameTimer.Enabled = false;
+        Sprites.Clear();
+
+        try {
+            gameTimer.Dispose();
+            TimerDisposed = true;
+        }
+        catch (Exception e) {
+            Console.WriteLine(e.Message);
+        }
+
+        SVG_Markup = Rect(0, 0, WIDTH, HEIGHT, StartColor);
+        GameOver = true;
+        Console.WriteLine("Game ended.");
+    }
+
+    private void GetUserKeyInput(KeyboardEventArgs kArgs) {
+
+
+        if (kArgs.Code.Equals("KeyA"))
+        {
+            Console.WriteLine("A pressed.");
+
+        }
+
+        else if (kArgs.Code.Equals("KeyW"))
+        {
+            Console.WriteLine("W pressed.");
+
+        }
+
+        else if (kArgs.Code.Equals("KeyS"))
+        {
+            Console.WriteLine("S pressed.");
+
+        }
+
+        else if (kArgs.Code.Equals("KeyD"))
+        {
+            Console.WriteLine("D pressed.");
+
+        }
+
+        else if (kArgs.Code.Equals("Space"))
+        {
+            Console.WriteLine("Space bar pressed.");
+            Sprite sp = new Sprite(rand.Next(0, WIDTH), rand.Next(0, HEIGHT));
+            sp.InternalMarkup = "<circle cx=\"0\" cy=\"0\" r=\"20\" fill=\"#a01010\"/>" +
+            "<rect x=\"-20\" y=\"-30\" width=\"40\" height=\"10\" fill=\"green\" />";
+            sp.VelocityX = rand.Next(5, 10);
+            sp.VelocityY = rand.Next(5, 10);
+            sp.RotationVelocity = rand.Next(1, 10);
+
+            Sprites.Add(sp);
+        }
+
+    }
+
+    private void ProcessConsoleInput(KeyboardEventArgs kArgs) {
+
+        if (kArgs.Code.Equals("ArrowUp"))
+        {
+            Console.WriteLine("Up Arrow pressed.");
+        }
+
+        if (kArgs.Code.Equals("Enter"))
+        {
+            string entry = ConsoleInput;
+
+            foreach(char c in BADCHARS)
+                entry = entry.Replace(c, ' ');
+            
+            entry = entry.ToLower().Trim();
+
+            while(entry.Contains("  "))
+             entry = entry.Replace("  ", " ");
+
+            if (String.IsNullOrEmpty(entry))
+                return;
+            
+            if (entry.Equals("clear"))
+            {
+                ConsoleOutput = "";
+            }
+
+            else if (entry.Equals("red"))
+            {
+                SVG_Markup = Rect(0, 0, WIDTH, HEIGHT, RedColor);
+            }
+
+            else if (entry.Equals("green"))
+            {
+                SVG_Markup = Rect(0, 0, WIDTH, HEIGHT, GreenColor);
+            }
+
+            else if (entry.Equals("blue"))
+            {
+                SVG_Markup = Rect(0, 0, WIDTH, HEIGHT, BlueColor);
+            }
+
+            else
+            {
+                Console.WriteLine("You entered: " + entry);
+            }
+
+            ConsoleEntries.Add(entry);
+            ConsoleEntriesIndex = ConsoleEntries.Count - 1;
+            ConsoleInput = ">> ";
+        }
+
+    }
+
+    private void PrintToConsole(string str) {
+
+        ConsoleOutput  = ("<div> - " + str + "</div>" + ConsoleOutput);
+    }
+
+    public string Rect(int x, int y, int width, int height, string color) {
+
+        return "<rect x=\"" + x
+            + "\" y=\"" + y
+            + "\" width=\"" + width
+            + "\" height=\"" + height
+            + "\" fill=\"" + color + "\"></rect>";
+    }
+
+    public string GetHexColor(int r, int g, int b) {
+
+        return "#" + Convert.ToHexString(new byte[3] {(byte)r, (byte)g, (byte)b});
+    }
+
+}
